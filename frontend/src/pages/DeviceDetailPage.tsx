@@ -5,6 +5,8 @@ import { fetchDeviceFields, fetchGraphData } from "../api";
 import { GraphBuilder } from "../components/GraphBuilder";
 import type { GraphResponse } from "../types";
 
+type TimePreset = "last4h" | "lastDay" | "lastWeek" | "custom";
+
 function getDefaultRange() {
   const to = new Date();
   const from = new Date(to.getTime() - 60 * 60 * 1000);
@@ -23,6 +25,7 @@ export function DeviceDetailPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [range, setRange] = useState(getDefaultRange());
+  const [timePreset, setTimePreset] = useState<TimePreset>("lastDay");
 
   useEffect(() => {
     if (!Number.isFinite(deviceId)) {
@@ -50,10 +53,25 @@ export function DeviceDetailPage() {
     setLoading(true);
     setError("");
     try {
+      const now = new Date();
+      let fromDate = new Date(range.fromIso);
+      let toDate = new Date(range.toIso);
+
+      if (timePreset === "last4h") {
+        toDate = now;
+        fromDate = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+      } else if (timePreset === "lastDay") {
+        toDate = now;
+        fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      } else if (timePreset === "lastWeek") {
+        toDate = now;
+        fromDate = new Date(now.getTime() - 168 * 60 * 60 * 1000);
+      }
+
       const result = await fetchGraphData({
         deviceId,
-        fromIso: new Date(range.fromIso).toISOString(),
-        toIso: new Date(range.toIso).toISOString(),
+        fromIso: fromDate.toISOString(),
+        toIso: toDate.toISOString(),
         fields: selected
       });
       setGraph(result);
@@ -90,21 +108,37 @@ export function DeviceDetailPage() {
 
         <div className="range-row">
           <label>
-            From
-            <input
-              type="datetime-local"
-              value={range.fromIso}
-              onChange={(event) => setRange((r) => ({ ...r, fromIso: event.target.value }))}
-            />
+            Time Range
+            <select
+              value={timePreset}
+              onChange={(event) => setTimePreset(event.target.value as TimePreset)}
+            >
+              <option value="last4h">Last 4 Hours</option>
+              <option value="lastDay">Last Day</option>
+              <option value="lastWeek">Last Week</option>
+              <option value="custom">Custom</option>
+            </select>
           </label>
-          <label>
-            To
-            <input
-              type="datetime-local"
-              value={range.toIso}
-              onChange={(event) => setRange((r) => ({ ...r, toIso: event.target.value }))}
-            />
-          </label>
+          {timePreset === "custom" ? (
+            <>
+              <label>
+                From
+                <input
+                  type="datetime-local"
+                  value={range.fromIso}
+                  onChange={(event) => setRange((r) => ({ ...r, fromIso: event.target.value }))}
+                />
+              </label>
+              <label>
+                To
+                <input
+                  type="datetime-local"
+                  value={range.toIso}
+                  onChange={(event) => setRange((r) => ({ ...r, toIso: event.target.value }))}
+                />
+              </label>
+            </>
+          ) : null}
           <button
             className="card-link graph-button"
             disabled={loading || selected.length === 0}

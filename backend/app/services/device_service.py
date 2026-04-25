@@ -16,6 +16,16 @@ DEFAULT_FIELDS = [
     "r4State",
     "heatSetpoint",
 ]
+GRAPHABLE_COLUMN_MAP = {
+    "tempA": "tempA",
+    "humA": "humA",
+    "tempB": "tempB",
+    "humB": "humB",
+    "r1State": "r1State",
+    "r2State": "r2State",
+    "r3State": "r3State",
+    "r4State": "r4State",
+}
 
 def _resolve_timezone(name: str):
     try:
@@ -86,6 +96,29 @@ def _extract_config_value(config_text: str, label: str, unit: str | None = None)
     return None
 
 
+def _extract_config_float(config_text: str, label: str) -> float | None:
+    pattern = rf"{re.escape(label)}:\s*([\d.]+)"
+    match = re.search(pattern, config_text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
+
+
+def _normalize_db_datetime(raw_dt: datetime) -> datetime:
+    if raw_dt.tzinfo is None:
+        return _attach_timezone(raw_dt, DB_TIMESTAMP_TIMEZONE).astimezone(APP_TIMEZONE)
+    return raw_dt.astimezone(APP_TIMEZONE)
+
+
+def _to_db_naive(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(DB_TIMESTAMP_TIMEZONE).replace(tzinfo=None)
+
+
 def _get_latest_status(device_id: int) -> tuple[datetime | None, dict[str, float | int | str]]:
     table_name = _table_name_for_device(device_id)
     query = f"""
@@ -103,11 +136,7 @@ def _get_latest_status(device_id: int) -> tuple[datetime | None, dict[str, float
 
     raw_last_seen = row.get("datetime")
     if isinstance(raw_last_seen, datetime):
-        # MySQL DATETIME is often naive; interpret in DB timezone, then convert.
-        if raw_last_seen.tzinfo is None:
-            last_seen = _attach_timezone(raw_last_seen, DB_TIMESTAMP_TIMEZONE).astimezone(APP_TIMEZONE)
-        else:
-            last_seen = raw_last_seen.astimezone(APP_TIMEZONE)
+        last_seen = _normalize_db_datetime(raw_last_seen)
     else:
         last_seen = None
 
@@ -227,26 +256,82 @@ def get_plottable_fields(device_id: int) -> list[str]:
 
 
 def build_graph(device_id: int, request: GraphRequest) -> GraphResponse:
-    # Scaffold response with synthetic points so frontend wiring works
-    # before SQL query logic is plugged in.
-    points = []
-    cursor = request.from_iso
-    index = 0
-    while cursor <= request.to_iso:
-        points.append({"x": cursor.isoformat(), "y": 70 + (index % 10)})
-        cursor += timedelta(minutes=5)
-        index += 1
+    table_name = _table_name_for_device(device_id)
+    requested = [field for field in request.fields if field in DEFAULT_FIELDS]
+    db_start = _to_db_naive(request.from_iso)
+    db_end = _to_db_naive(request.to_iso)
+
+    column_fields = [field for field in requested if field in GRAPHABLE_COLUMN_MAP]
+    rows: list[dict] = []
+    if column_fields:
+        select_columns = ", ".join([GRAPHABLE_COLUMN_MAP[field] for field in column_fields])
+        query = f"""
+            SELECT datetime, {select_columns}
+            FROM {table_name}
+            WHERE datetime BETWEEN %s AND %s
+            ORDER BY datetime
+        """
+        with db_cursor() as cursor:
+            cursor.execute(query, (db_start, db_end))
+            rows = cursor.fetchall()
 
     series: list[GraphSeries] = []
-    for field in request.fields:
+    for field in column_fields:
         y_axis = "right" if field.startswith("r") and field.endswith("State") else "left"
-        mode = "lines" if y_axis == "left" else "lines+markers"
+        points: list[dict[str, float | str]] = []
+        for row in rows:
+            raw_dt = row.get("datetime")
+            value = row.get(GRAPHABLE_COLUMN_MAP[field])
+            if not isinstance(raw_dt, datetime) or value is None:
+                continue
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError):
+                continue
+            points.append({"x": _normalize_db_datetime(raw_dt).isoformat(), "y": numeric_value})
         series.append(
             GraphSeries(
                 name=field,
-                mode=mode,
+                mode="lines",
                 y_axis=y_axis,
                 data=points,
+            )
+        )
+
+    if request.include_setpoints and "heatSetpoint" in requested:
+        cfg_query = f"""
+            SELECT datetime, configValues
+            FROM {table_name}
+            WHERE datetime BETWEEN %s AND %s
+              AND configValues IS NOT NULL
+              AND configValues <> ''
+            ORDER BY datetime
+        """
+        with db_cursor() as cursor:
+            cursor.execute(cfg_query, (db_start, db_end))
+            cfg_rows = cursor.fetchall()
+
+        setpoint_points: list[dict[str, float | str]] = []
+        last_value: float | None = None
+        for row in cfg_rows:
+            raw_dt = row.get("datetime")
+            config_values = row.get("configValues")
+            if not isinstance(raw_dt, datetime) or not isinstance(config_values, str):
+                continue
+            setpoint = _extract_config_float(config_values, "Heat Setpoint")
+            if setpoint is None:
+                continue
+            if last_value is not None and abs(last_value - setpoint) < 1e-9:
+                continue
+            last_value = setpoint
+            setpoint_points.append({"x": _normalize_db_datetime(raw_dt).isoformat(), "y": setpoint})
+
+        series.append(
+            GraphSeries(
+                name="heatSetpoint",
+                mode="lines",
+                y_axis="left",
+                data=setpoint_points,
             )
         )
 
