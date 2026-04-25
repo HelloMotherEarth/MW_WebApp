@@ -71,10 +71,25 @@ def _table_exists(device_id: int) -> bool:
         return cursor.fetchone() is not None
 
 
+def _extract_config_value(config_text: str, label: str, unit: str | None = None) -> str | None:
+    if unit:
+        pattern = rf"{re.escape(label)}:\s*([\d.]+)\s*{re.escape(unit)}"
+        match = re.search(pattern, config_text, flags=re.IGNORECASE)
+        if match:
+            return f"{match.group(1)} {unit}"
+        return None
+
+    pattern = rf"{re.escape(label)}:\s*([^,]+)"
+    match = re.search(pattern, config_text, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
 def _get_latest_status(device_id: int) -> tuple[datetime | None, dict[str, float | int | str]]:
     table_name = _table_name_for_device(device_id)
     query = f"""
-        SELECT datetime, tempA, humA, tempB, humB, r1State, r2State, r3State, r4State
+        SELECT datetime, tempA, humA, tempB, humB, r1State, r2State, r3State, r4State, configValues
         FROM {table_name}
         ORDER BY datetime DESC
         LIMIT 1
@@ -106,6 +121,16 @@ def _get_latest_status(device_id: int) -> tuple[datetime | None, dict[str, float
         "r3State": row.get("r3State"),
         "r4State": row.get("r4State"),
     }
+
+    config_values = row.get("configValues")
+    if isinstance(config_values, str) and config_values.strip():
+        status["heatSetpoint"] = _extract_config_value(config_values, "Heat Setpoint", "F")
+        status["fanOn"] = _extract_config_value(config_values, "Fan On", "sec")
+        status["fanCycle"] = _extract_config_value(config_values, "Fan Cyc", "min")
+        status["humOn"] = _extract_config_value(config_values, "Hum On", "sec")
+        status["humCycle"] = _extract_config_value(config_values, "Hum Cyc", "min")
+        status["humOffset"] = _extract_config_value(config_values, "Hum Offset", "min")
+
     return last_seen, status
 
 
@@ -170,7 +195,7 @@ def get_device(device_id: int) -> DeviceSummary | None:
         is_online = (datetime.now(APP_TIMEZONE) - last_seen) <= timedelta(minutes=10)
     return DeviceSummary(
         id=device_id,
-        name=f"Module {device_id:03d}",
+        name=f"Controller {device_id:03d}",
         location=None,
         table_name=_table_name_for_device(device_id),
         is_online=is_online,

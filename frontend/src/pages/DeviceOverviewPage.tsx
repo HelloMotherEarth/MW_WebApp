@@ -6,7 +6,6 @@ import type { DeviceSummary } from "../types";
 
 type SlotState = {
   id: number | null;
-  input: string;
   device: DeviceSummary | null;
   error: string;
 };
@@ -22,7 +21,7 @@ function arraysEqual(left: number[], right: number[]): boolean {
 
 export function DeviceOverviewPage() {
   const [slots, setSlots] = useState<SlotState[]>(
-    Array.from({ length: SLOT_COUNT }, () => ({ id: null, input: "", device: null, error: "" }))
+    Array.from({ length: SLOT_COUNT }, () => ({ id: null, device: null, error: "" }))
   );
   const [moduleIds, setModuleIds] = useState<number[]>([]);
   const [pageStart, setPageStart] = useState<number>(0);
@@ -62,7 +61,6 @@ export function DeviceOverviewPage() {
               ? {
                   ...slot,
                   id,
-                  input: id.toString(),
                   device: cached ?? null,
                   error: cached ? "" : "Loading..."
                 }
@@ -72,7 +70,7 @@ export function DeviceOverviewPage() {
       } else {
         setSlots((current) =>
           current.map((slot, index) =>
-            index === i ? { ...slot, id: null, input: "", device: null, error: "No module in this slot" } : slot
+            index === i ? { ...slot, id: null, device: null, error: "No module in this slot" } : slot
           )
         );
       }
@@ -163,50 +161,6 @@ export function DeviceOverviewPage() {
     };
   }, [pageStart]);
 
-  const updateSlotInput = (slotIndex: number, value: string) => {
-    setSlots((current) =>
-      current.map((slot, index) => (index === slotIndex ? { ...slot, input: value, error: "" } : slot))
-    );
-  };
-
-  const applySlotModule = async (slotIndex: number) => {
-    const parsed = Number(slots[slotIndex].input);
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 999) {
-      setSlots((current) =>
-        current.map((slot, index) =>
-          index === slotIndex ? { ...slot, error: "Enter a module number from 1 to 999" } : slot
-        )
-      );
-      return;
-    }
-    if (!moduleIds.includes(parsed)) {
-      setSlots((current) =>
-        current.map((slot, index) =>
-          index === slotIndex
-            ? { ...slot, id: parsed, device: null, error: `Module ${parsed.toString().padStart(3, "0")} does not exist` }
-            : slot
-        )
-      );
-      return;
-    }
-    try {
-      const device = await fetchDevice(parsed);
-      setSlots((current) =>
-        current.map((slot, index) =>
-          index === slotIndex ? { ...slot, id: parsed, device, error: "" } : slot
-        )
-      );
-    } catch (err) {
-      setSlots((current) =>
-        current.map((slot, index) =>
-          index === slotIndex
-            ? { ...slot, id: parsed, device: null, error: err instanceof Error ? err.message : "Failed to load module" }
-            : slot
-        )
-      );
-    }
-  };
-
   const canGoPrev = pageStart > 0;
   const canGoNext = pageStart + SLOT_COUNT < moduleIds.length;
   const pageEnd = Math.min(pageStart + SLOT_COUNT, moduleIds.length);
@@ -233,23 +187,7 @@ export function DeviceOverviewPage() {
         {slots.map((slot, index) => (
           <div className="slot-card" key={`slot-${index.toString()}`}>
             {slot.device ? <DeviceCard device={slot.device} /> : <div className="device-card muted">No module selected.</div>}
-            <div className="slot-controls">
-              <label htmlFor={`slot-input-${index.toString()}`}>Module</label>
-              <div className="slot-controls-row">
-                <input
-                  id={`slot-input-${index.toString()}`}
-                  max={999}
-                  min={1}
-                  type="number"
-                  value={slot.input}
-                  onChange={(event) => updateSlotInput(index, event.target.value)}
-                />
-                <button onClick={() => void applySlotModule(index)} type="button">
-                  Apply
-                </button>
-              </div>
-              {slot.error ? <p className="error">{slot.error}</p> : null}
-            </div>
+            {slot.error ? <p className="error">{slot.error}</p> : null}
           </div>
         ))}
       </section>

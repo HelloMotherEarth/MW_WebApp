@@ -67,8 +67,10 @@ export function DeviceDetailPage() {
   return (
     <main className="layout">
       <header className="page-header">
-        <Link to="/MW">Back to overview</Link>
-        <h1>Device {deviceId} Graph Builder</h1>
+        <Link className="card-link nav-link" to="/MW">
+          Back to Overview
+        </Link>
+        <h1>Controller {deviceId} Graph Builder</h1>
       </header>
 
       <section className="panel">
@@ -103,7 +105,12 @@ export function DeviceDetailPage() {
               onChange={(event) => setRange((r) => ({ ...r, toIso: event.target.value }))}
             />
           </label>
-          <button disabled={loading || selected.length === 0} onClick={onGraph} type="button">
+          <button
+            className="card-link graph-button"
+            disabled={loading || selected.length === 0}
+            onClick={onGraph}
+            type="button"
+          >
             {loading ? "Graphing..." : "Graph"}
           </button>
         </div>
