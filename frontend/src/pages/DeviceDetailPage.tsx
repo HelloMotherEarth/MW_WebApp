@@ -6,6 +6,32 @@ import { GraphBuilder } from "../components/GraphBuilder";
 import type { GraphResponse } from "../types";
 
 type TimePreset = "last4h" | "lastDay" | "lastWeek" | "custom";
+const fieldLabelMap: Record<string, string> = {
+  tempA: "Temp A",
+  tempB: "Temp B",
+  humA: "Hum A",
+  humB: "Hum B",
+  r1State: "Fan",
+  r3State: "Humifier",
+  r4State: "Heater",
+  heatSetpoint: "Heat Setpoint"
+};
+const exportFieldTokenMap: Record<string, string> = {
+  tempA: "Ta",
+  tempB: "Tb",
+  humA: "Ha",
+  humB: "Hb",
+  r1State: "Fn",
+  r3State: "Hmfr",
+  r4State: "Htr",
+  heatSetpoint: "Htstpnt"
+};
+const exportRangeTokenMap: Record<TimePreset, string> = {
+  last4h: "4hrs",
+  lastDay: "day",
+  lastWeek: "week",
+  custom: "cstm"
+};
 
 function getDefaultRange() {
   const to = new Date();
@@ -26,6 +52,7 @@ export function DeviceDetailPage() {
   const [error, setError] = useState("");
   const [range, setRange] = useState(getDefaultRange());
   const [timePreset, setTimePreset] = useState<TimePreset>("lastDay");
+  const [useMovingAvg, setUseMovingAvg] = useState(false);
 
   useEffect(() => {
     if (!Number.isFinite(deviceId)) {
@@ -73,7 +100,8 @@ export function DeviceDetailPage() {
         fromIso: fromDate.toISOString(),
         toIso: toDate.toISOString(),
         fields: selected,
-        includeSetpoints: selected.includes("heatSetpoint")
+        includeSetpoints: selected.includes("heatSetpoint"),
+        includeMovingAvg: useMovingAvg
       });
       setGraph(result);
     } catch (err) {
@@ -82,6 +110,12 @@ export function DeviceDetailPage() {
       setLoading(false);
     }
   };
+
+  const selectedExportTokens = selected
+    .map((field) => exportFieldTokenMap[field])
+    .filter((token): token is string => Boolean(token));
+  const controllerToken = deviceId.toString().padStart(3, "0");
+  const exportPrefix = `MW${controllerToken}_${exportRangeTokenMap[timePreset]}_${selectedExportTokens.join("-") || "none"}`;
 
   return (
     <main className="layout">
@@ -102,7 +136,7 @@ export function DeviceDetailPage() {
                 checked={selected.includes(field)}
                 onChange={() => onFieldChange(field)}
               />
-              {field}
+              {fieldLabelMap[field] ?? field}
             </label>
           ))}
         </div>
@@ -148,12 +182,19 @@ export function DeviceDetailPage() {
           >
             {loading ? "Graphing..." : "Graph"}
           </button>
+          <button
+            className={`card-link graph-button moving-avg-button ${useMovingAvg ? "active" : ""}`}
+            onClick={() => setUseMovingAvg((current) => !current)}
+            type="button"
+          >
+            Use Moving Avg
+          </button>
         </div>
 
         {error ? <p className="error">{error}</p> : null}
       </section>
 
-      <GraphBuilder graph={graph} />
+      <GraphBuilder graph={graph} exportPrefix={exportPrefix} />
     </main>
   );
 }

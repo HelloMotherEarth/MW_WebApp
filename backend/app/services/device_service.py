@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from collections import deque
 import os
 import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -117,6 +118,25 @@ def _to_db_naive(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt
     return dt.astimezone(DB_TIMESTAMP_TIMEZONE).replace(tzinfo=None)
+
+
+def _apply_moving_average(points: list[tuple[datetime, float]], window_minutes: int = 60) -> list[tuple[datetime, float]]:
+    window = deque()
+    running_sum = 0.0
+    averaged: list[tuple[datetime, float]] = []
+    window_delta = timedelta(minutes=window_minutes)
+
+    for point_dt, value in points:
+        window.append((point_dt, value))
+        running_sum += value
+
+        while window and (point_dt - window[0][0]) > window_delta:
+            _, removed = window.popleft()
+            running_sum -= removed
+
+        averaged.append((point_dt, running_sum / len(window)))
+
+    return averaged
 
 
 def _get_latest_status(device_id: int) -> tuple[datetime | None, dict[str, float | int | str]]:
@@ -282,7 +302,7 @@ def build_graph(device_id: int, request: GraphRequest) -> GraphResponse:
     series: list[GraphSeries] = []
     for field in column_fields:
         y_axis = "right" if field.startswith("r") and field.endswith("State") else "left"
-        points: list[dict[str, float | str]] = []
+        series_points: list[tuple[datetime, float]] = []
         for row in rows:
             raw_dt = row.get("datetime")
             value = row.get(GRAPHABLE_COLUMN_MAP[field])
@@ -292,7 +312,12 @@ def build_graph(device_id: int, request: GraphRequest) -> GraphResponse:
                 numeric_value = float(value)
             except (TypeError, ValueError):
                 continue
-            points.append({"x": _normalize_db_datetime(raw_dt).isoformat(), "y": numeric_value})
+            series_points.append((_normalize_db_datetime(raw_dt), numeric_value))
+
+        if request.include_moving_avg and field in {"tempA", "humA", "tempB", "humB"}:
+            series_points = _apply_moving_average(series_points, window_minutes=60)
+
+        points = [{"x": point_dt.isoformat(), "y": value} for point_dt, value in series_points]
         series.append(
             GraphSeries(
                 name=field,

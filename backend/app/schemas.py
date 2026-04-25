@@ -33,6 +33,7 @@ class GraphRequest(BaseModel):
     from_iso: datetime = Field(alias="from")
     to_iso: datetime = Field(alias="to")
     include_setpoints: bool = True
+    include_moving_avg: bool = False
 
     class Config:
         populate_by_name = True

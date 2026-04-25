@@ -78,6 +78,14 @@ body {
   cursor: pointer;
 }
 
+.moving-avg-button {
+  background: linear-gradient(135deg, #475569, #334155);
+}
+
+.moving-avg-button.active {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
 .graph-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -177,4 +185,20 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.graph-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.graph-header-row h3 {
+  margin: 0;
+}
+
+.export-button {
+  margin-top: 0;
 }

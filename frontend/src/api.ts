@@ -43,6 +43,7 @@ export async function fetchGraphData(params: {
   toIso: string;
   fields: string[];
   includeSetpoints?: boolean;
+  includeMovingAvg?: boolean;
 }): Promise<GraphResponse> {
   const response = await fetch(`${API_BASE}/devices/${params.deviceId}/graph`, {
     method: "POST",
@@ -51,7 +52,8 @@ export async function fetchGraphData(params: {
       from: params.fromIso,
       to: params.toIso,
       fields: params.fields,
-      include_setpoints: params.includeSetpoints ?? false
+      include_setpoints: params.includeSetpoints ?? false,
+      include_moving_avg: params.includeMovingAvg ?? false
     })
   });
   if (!response.ok) {
