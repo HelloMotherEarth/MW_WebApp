@@ -18,6 +18,16 @@ export function GraphBuilder({ graph }: Props) {
   };
 
   const hasRelaySeries = graph.series.some((series) => relayOrder.includes(series.name.toLowerCase()));
+  const colorBySeries: Record<string, string> = {
+    tempa: "#ff0000",
+    huma: "#0000ff",
+    tempb: "#ff9aa2",
+    humb: "#8ec5ff",
+    r1state: "#16a34a",
+    r3state: "#1e3a8a",
+    r4state: "#7f1d1d",
+    heatsetpoint: "#f59e0b"
+  };
 
   const traces = graph.series.map((series) => ({
     ...(series.name.toLowerCase().endsWith("state")
@@ -42,7 +52,8 @@ export function GraphBuilder({ graph }: Props) {
           ? ("hv" as const)
           : ("linear" as const),
       width: series.name === "heatSetpoint" ? 2.5 : 1.6,
-      dash: series.name === "heatSetpoint" ? ("dash" as const) : ("solid" as const)
+      dash: series.name === "heatSetpoint" ? ("dash" as const) : ("solid" as const),
+      color: colorBySeries[series.name.toLowerCase()] ?? "#334155"
     }
   }));
 
