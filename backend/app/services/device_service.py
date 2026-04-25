@@ -258,8 +258,12 @@ def get_plottable_fields(device_id: int) -> list[str]:
 def build_graph(device_id: int, request: GraphRequest) -> GraphResponse:
     table_name = _table_name_for_device(device_id)
     requested = [field for field in request.fields if field in DEFAULT_FIELDS]
-    db_start = _to_db_naive(request.from_iso)
-    db_end = _to_db_naive(request.to_iso)
+    now_app = datetime.now(APP_TIMEZONE)
+    effective_to = request.to_iso if request.to_iso <= now_app else now_app
+    effective_from = request.from_iso if request.from_iso <= effective_to else effective_to
+
+    db_start = _to_db_naive(effective_from)
+    db_end = _to_db_naive(effective_to)
 
     column_fields = [field for field in requested if field in GRAPHABLE_COLUMN_MAP]
     rows: list[dict] = []
@@ -301,6 +305,17 @@ def build_graph(device_id: int, request: GraphRequest) -> GraphResponse:
     if request.include_setpoints and "heatSetpoint" in requested:
         cfg_query = f"""
             SELECT datetime, configValues
+            FROM (
+                SELECT datetime, configValues
+                FROM {table_name}
+                WHERE datetime < %s
+                  AND configValues IS NOT NULL
+                  AND configValues <> ''
+                ORDER BY datetime DESC
+                LIMIT 1
+            ) AS before_range
+            UNION ALL
+            SELECT datetime, configValues
             FROM {table_name}
             WHERE datetime BETWEEN %s AND %s
               AND configValues IS NOT NULL
@@ -308,7 +323,7 @@ def build_graph(device_id: int, request: GraphRequest) -> GraphResponse:
             ORDER BY datetime
         """
         with db_cursor() as cursor:
-            cursor.execute(cfg_query, (db_start, db_end))
+            cursor.execute(cfg_query, (db_start, db_start, db_end))
             cfg_rows = cursor.fetchall()
 
         setpoint_points: list[dict[str, float | str]] = []
@@ -324,7 +339,26 @@ def build_graph(device_id: int, request: GraphRequest) -> GraphResponse:
             if last_value is not None and abs(last_value - setpoint) < 1e-9:
                 continue
             last_value = setpoint
-            setpoint_points.append({"x": _normalize_db_datetime(raw_dt).isoformat(), "y": setpoint})
+            normalized_dt = _normalize_db_datetime(raw_dt)
+            point_x = normalized_dt
+            if normalized_dt < request.from_iso:
+                # Anchor the carried-forward setpoint at graph start.
+                point_x = effective_from
+            setpoint_points.append({"x": point_x.isoformat(), "y": setpoint})
+
+        # Carry the last known setpoint to the end of the selected range
+        # so the step line does not stop at the final change timestamp.
+        if setpoint_points and last_value is not None:
+            last_point_x = setpoint_points[-1]["x"]
+            if isinstance(last_point_x, str):
+                try:
+                    last_point_dt = datetime.fromisoformat(last_point_x)
+                except ValueError:
+                    last_point_dt = effective_to
+            else:
+                last_point_dt = effective_to
+            if last_point_dt < effective_to:
+                setpoint_points.append({"x": effective_to.isoformat(), "y": last_value})
 
         series.append(
             GraphSeries(
@@ -337,7 +371,7 @@ def build_graph(device_id: int, request: GraphRequest) -> GraphResponse:
 
     return GraphResponse(
         device_id=device_id,
-        from_iso=request.from_iso,
-        to_iso=request.to_iso,
+        from_iso=effective_from,
+        to_iso=effective_to,
         series=series,
     )

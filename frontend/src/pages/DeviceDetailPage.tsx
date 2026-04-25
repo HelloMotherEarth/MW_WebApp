@@ -72,7 +72,8 @@ export function DeviceDetailPage() {
         deviceId,
         fromIso: fromDate.toISOString(),
         toIso: toDate.toISOString(),
-        fields: selected
+        fields: selected,
+        includeSetpoints: selected.includes("heatSetpoint")
       });
       setGraph(result);
     } catch (err) {

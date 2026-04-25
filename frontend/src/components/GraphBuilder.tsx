@@ -37,7 +37,10 @@ export function GraphBuilder({ graph }: Props) {
     x: series.data.map((point) => point.x),
     yaxis: series.y_axis === "right" ? "y2" : "y",
     line: {
-      shape: series.name.endsWith("State") ? ("hv" as const) : ("linear" as const),
+      shape:
+        series.name.endsWith("State") || series.name === "heatSetpoint"
+          ? ("hv" as const)
+          : ("linear" as const),
       width: series.name === "heatSetpoint" ? 2.5 : 1.6,
       dash: series.name === "heatSetpoint" ? ("dash" as const) : ("solid" as const)
     }

@@ -42,6 +42,7 @@ export async function fetchGraphData(params: {
   fromIso: string;
   toIso: string;
   fields: string[];
+  includeSetpoints?: boolean;
 }): Promise<GraphResponse> {
   const response = await fetch(`${API_BASE}/devices/${params.deviceId}/graph`, {
     method: "POST",
@@ -50,7 +51,7 @@ export async function fetchGraphData(params: {
       from: params.fromIso,
       to: params.toIso,
       fields: params.fields,
-      include_setpoints: true
+      include_setpoints: params.includeSetpoints ?? false
     })
   });
   if (!response.ok) {
