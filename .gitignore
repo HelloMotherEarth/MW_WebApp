@@ -1,0 +1,11 @@
+# Local environment and secrets
+.env
+.env.local
+.env.*.local
+.secrets/
+reference/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
