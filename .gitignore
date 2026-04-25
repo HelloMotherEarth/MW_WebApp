@@ -16,3 +16,7 @@ __pycache__/
 
 # Frontend dependencies
 frontend/node_modules/
+
+# Frontend build artifacts
+frontend/dist/
+frontend/tsconfig.tsbuildinfo

@@ -10,12 +10,31 @@ export function GraphBuilder({ graph }: Props) {
     return <div className="panel">Select fields and click Graph.</div>;
   }
 
+  const relayOrder = ["r4state", "r3state", "r1state"];
+  const relayOffsets: Record<string, number> = {
+    r1state: 0,
+    r3state: 2,
+    r4state: 4
+  };
+
+  const hasRelaySeries = graph.series.some((series) => relayOrder.includes(series.name.toLowerCase()));
+
   const traces = graph.series.map((series) => ({
+    ...(series.name.toLowerCase().endsWith("state")
+      ? {
+          y: series.data.map((point) => {
+            const relayKey = series.name.toLowerCase();
+            const offset = relayOffsets[relayKey] ?? 0;
+            return point.y + offset;
+          })
+        }
+      : {
+          y: series.data.map((point) => point.y)
+        }),
     type: "scatter" as const,
     mode: "lines" as const,
     name: series.name,
     x: series.data.map((point) => point.x),
-    y: series.data.map((point) => point.y),
     yaxis: series.y_axis === "right" ? "y2" : "y",
     line: {
       shape: series.name.endsWith("State") ? ("hv" as const) : ("linear" as const),
@@ -38,7 +57,15 @@ export function GraphBuilder({ graph }: Props) {
           yaxis2: {
             title: { text: "Relay State" },
             overlaying: "y",
-            side: "right"
+            side: "right",
+            ...(hasRelaySeries
+              ? {
+                  tickmode: "array" as const,
+                  tickvals: [4.5, 2.5, 0.5],
+                  ticktext: ["R4", "R3", "R1"],
+                  range: [-0.25, 5.25]
+                }
+              : {})
           },
           legend: { orientation: "h", y: 1.12 }
         }}
