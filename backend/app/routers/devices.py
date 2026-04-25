@@ -5,8 +5,10 @@ from app.services.device_service import (
     build_graph,
     get_device,
     get_plottable_fields,
+    get_time_debug,
     list_devices,
     list_device_statuses,
+    list_module_ids,
 )
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
@@ -15,6 +17,11 @@ router = APIRouter(prefix="/api/devices", tags=["devices"])
 @router.get("", response_model=list[DeviceSummary])
 def get_devices() -> list[DeviceSummary]:
     return list_devices()
+
+
+@router.get("/module-ids", response_model=list[int])
+def get_module_ids() -> list[int]:
+    return list_module_ids()
 
 
 @router.get("/status", response_model=list[DeviceStatus])
@@ -45,3 +52,11 @@ def post_graph(device_id: int, request: GraphRequest) -> GraphResponse:
     if not request.fields:
         raise HTTPException(status_code=400, detail="At least one field is required")
     return build_graph(device_id, request)
+
+
+@router.get("/{device_id}/time-debug")
+def time_debug(device_id: int) -> dict[str, str | bool | int | float | None]:
+    payload = get_time_debug(device_id)
+    if not payload:
+        raise HTTPException(status_code=404, detail="Device not found")
+    return payload

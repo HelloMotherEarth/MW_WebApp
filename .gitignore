@@ -9,3 +9,10 @@ reference/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Frontend dependencies
+frontend/node_modules/
