@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { fetchDevice, fetchDevices, fetchModuleIds } from "../api";
 import { DeviceCard } from "../components/DeviceCard";
@@ -13,6 +13,13 @@ type SlotState = {
 
 const SLOT_COUNT = 4;
 
+function arraysEqual(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((value, index) => value === right[index]);
+}
+
 export function DeviceOverviewPage() {
   const [slots, setSlots] = useState<SlotState[]>(
     Array.from({ length: SLOT_COUNT }, () => ({ id: null, input: "", device: null, error: "" }))
@@ -20,10 +27,25 @@ export function DeviceOverviewPage() {
   const [moduleIds, setModuleIds] = useState<number[]>([]);
   const [pageStart, setPageStart] = useState<number>(0);
   const [error, setError] = useState<string>("");
+  const moduleIdsRef = useRef<number[]>([]);
+  const refreshVersionRef = useRef<number>(0);
 
-  const hydrateSlot = async (slotIndex: number, id: number) => {
+  const setModuleIdsStable = (nextIds: number[]) => {
+    setModuleIds((current) => {
+      if (arraysEqual(current, nextIds)) {
+        return current;
+      }
+      moduleIdsRef.current = nextIds;
+      return nextIds;
+    });
+  };
+
+  const hydrateSlot = async (slotIndex: number, id: number, refreshVersion: number) => {
     try {
       const device = await fetchDevice(id);
+      if (refreshVersionRef.current !== refreshVersion) {
+        return;
+      }
       setSlots((current) =>
         current.map((slot, index) =>
           index === slotIndex
@@ -32,6 +54,9 @@ export function DeviceOverviewPage() {
         )
       );
     } catch (err) {
+      if (refreshVersionRef.current !== refreshVersion) {
+        return;
+      }
       setSlots((current) =>
         current.map((slot, index) =>
           index === slotIndex
@@ -48,11 +73,11 @@ export function DeviceOverviewPage() {
     }
   };
 
-  const hydrateSlotsForPage = (ids: number[], start: number) => {
+  const hydrateSlotsForPage = (ids: number[], start: number, refreshVersion: number) => {
     for (let i = 0; i < SLOT_COUNT; i += 1) {
       const id = ids[start + i];
       if (id !== undefined) {
-        void hydrateSlot(i, id);
+        void hydrateSlot(i, id, refreshVersion);
       } else {
         setSlots((current) =>
           current.map((slot, index) =>
@@ -66,17 +91,27 @@ export function DeviceOverviewPage() {
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
+      const refreshVersion = refreshVersionRef.current + 1;
+      refreshVersionRef.current = refreshVersion;
+
       try {
         const ids = await fetchModuleIds();
         if (isMounted) {
-          setModuleIds(ids);
+          // Keep stable ordering between refreshes so modules do not jump.
+          // Preserve current order for existing ids and append new ids at end.
+          const currentIds = moduleIdsRef.current;
+          const idsForRender =
+            currentIds.length === 0
+              ? ids
+              : [...currentIds.filter((id) => ids.includes(id)), ...ids.filter((id) => !currentIds.includes(id))];
+          setModuleIdsStable(idsForRender);
           setError("");
-          const maxStart = Math.max(0, ids.length - SLOT_COUNT);
+          const maxStart = Math.max(0, idsForRender.length - SLOT_COUNT);
           const clampedStart = Math.min(pageStart, maxStart);
           if (clampedStart !== pageStart) {
             setPageStart(clampedStart);
           }
-          hydrateSlotsForPage(ids, clampedStart);
+          hydrateSlotsForPage(idsForRender, clampedStart, refreshVersion);
         }
       } catch (err) {
         if (isMounted) {
@@ -101,13 +136,13 @@ export function DeviceOverviewPage() {
           .map((device) => device.id)
           .sort((a, b) => a - b);
         const orderedIds = [...onlineIds, ...offlineIds];
-        setModuleIds(orderedIds);
+        setModuleIdsStable(orderedIds);
         const maxStart = Math.max(0, orderedIds.length - SLOT_COUNT);
         const clampedStart = Math.min(pageStart, maxStart);
         if (clampedStart !== pageStart) {
           setPageStart(clampedStart);
         }
-        hydrateSlotsForPage(orderedIds, clampedStart);
+        hydrateSlotsForPage(orderedIds, clampedStart, refreshVersion);
       } catch {
         // Keep fallback ordering if full device status is slow/unavailable.
       }
