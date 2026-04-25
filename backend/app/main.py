@@ -1,17 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 from app.routers.devices import router as devices_router
 from app.services.db import check_db_connection
 
 app = FastAPI(title="MW Dashboard API", version="0.1.0")
 
+raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173,https://www.charliecoultas.com")
+allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://www.charliecoultas.com",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

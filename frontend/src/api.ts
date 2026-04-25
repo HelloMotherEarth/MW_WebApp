@@ -1,6 +1,7 @@
 import type { DeviceSummary, GraphResponse } from "./types";
 
-const API_BASE = "/api";
+const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const API_BASE = configuredBase && configuredBase.length > 0 ? `${configuredBase.replace(/\/$/, "")}/api` : "/api";
 
 export async function fetchDevices(): Promise<DeviceSummary[]> {
   const response = await fetch(`${API_BASE}/devices`);
