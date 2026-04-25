@@ -22,7 +22,7 @@ export function DeviceCard({ device }: Props) {
     : "No recent data";
 
   return (
-    <div className="device-card">
+    <div className={`device-card ${device.is_online ? "" : "offline-card"}`.trim()}>
       <div className="device-card-header">
         <h3>{device.name}</h3>
         <span className={device.is_online ? "badge online" : "badge offline"}>

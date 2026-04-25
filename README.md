@@ -1,21 +1,66 @@
-# MW Dashboard Scaffold
+# MW Dashboard
 
-This project is scaffolded for:
-- `backend/` Python FastAPI API (device status + graph query endpoints)
-- `frontend/` React + TypeScript UI (`/MW` overview and `/MW/device/:id`)
+Live dashboard for MW controllers with:
+- `backend/` FastAPI API for device status + graph data
+- `frontend/` React + TypeScript app for `/MW` and `/MW/device/:id`
 
-## Backend quick start
+## Project skeleton
 
+```text
+MWDashboard/
+|-- .env
+|-- .env.example
+|-- .gitignore
+|-- README.md
+|-- SETUP-SECRETS.md
+|-- .secrets/
+|   `-- README.md
+|-- reference/
+|   `-- (local example scripts / notes)
+|-- backend/
+|   |-- requirements.txt
+|   `-- app/
+|       |-- main.py                       # FastAPI app + CORS + health/db-check endpoints
+|       |-- schemas.py                    # Pydantic request/response models
+|       |-- routers/
+|       |   `-- devices.py                # /api/devices routes
+|       `-- services/
+|           |-- db.py                     # DB connection + env config helpers
+|           `-- device_service.py         # module discovery, status, graph queries
+`-- frontend/
+    |-- package.json
+    |-- package-lock.json
+    |-- index.html
+    |-- tsconfig.json
+    |-- vite.config.ts
+    `-- src/
+        |-- main.tsx                      # app bootstrap
+        |-- App.tsx                       # app routes
+        |-- api.ts                        # frontend API client
+        |-- types.ts                      # shared frontend types
+        |-- styles.css                    # global styles
+        |-- components/
+        |   |-- DeviceCard.tsx            # controller status card
+        |   `-- GraphBuilder.tsx          # Plotly graph renderer + export
+        |-- pages/
+        |   |-- DeviceOverviewPage.tsx    # /MW
+        |   `-- DeviceDetailPage.tsx      # /MW/device/:id
+        `-- types/
+            `-- plotly-js-dist-min.d.ts   # local module declaration
+```
+
+## Local run
+
+Backend:
 ```powershell
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-## Frontend quick start
-
+Frontend:
 ```powershell
 cd frontend
 npm install
@@ -24,26 +69,4 @@ npm run dev
 
 Open:
 - Frontend: `http://localhost:5173/MW`
-- API docs: `http://localhost:8000/docs`
-
-## What is scaffolded
-
-- Landing page with one panel per device (auto-refresh every 5s).
-- Device detail page with:
-  - field selection
-  - date/time range inputs
-  - graph request button
-- Backend endpoints:
-  - `GET /api/health`
-  - `GET /api/devices`
-  - `GET /api/devices/status`
-  - `GET /api/devices/{device_id}`
-  - `GET /api/devices/{device_id}/fields`
-  - `POST /api/devices/{device_id}/graph`
-
-## Next integration steps
-
-1. Replace mock `DEVICE_REGISTRY` and synthetic graph generation in `backend/app/services/device_service.py`.
-2. Add SQL query logic for your table pattern (`MWController_Module_XXX`).
-3. Replace the graph placeholder in `frontend/src/components/GraphBuilder.tsx` with Plotly.
-4. Add authentication before public deployment.
+- API docs: `http://127.0.0.1:8000/docs`

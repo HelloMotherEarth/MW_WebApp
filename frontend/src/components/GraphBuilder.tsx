@@ -19,7 +19,7 @@ const fieldLabelMap: Record<string, string> = {
 };
 
 export function GraphBuilder({ graph, exportPrefix = "MW" }: Props) {
-  const [graphDiv, setGraphDiv] = useState<Plotly.PlotlyHTMLElement | null>(null);
+  const [graphDiv, setGraphDiv] = useState<unknown>(null);
 
   if (!graph) {
     return <div className="panel">Select fields and click Graph.</div>;
@@ -37,7 +37,7 @@ export function GraphBuilder({ graph, exportPrefix = "MW" }: Props) {
     if (!graphDiv) {
       return;
     }
-    await Plotly.downloadImage(graphDiv, {
+    await Plotly.downloadImage(graphDiv as object, {
       format: "png",
       filename: buildExportFilename(),
       width: 1500,

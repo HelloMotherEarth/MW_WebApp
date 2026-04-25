@@ -53,6 +53,27 @@ body {
   text-decoration: none;
 }
 
+.device-card.offline-card {
+  color: #cbd5e1;
+}
+
+.device-card.offline-card h3,
+.device-card.offline-card strong,
+.device-card.offline-card .muted,
+.device-card.offline-card .label,
+.device-card.offline-card .badge {
+  color: #cbd5e1;
+}
+
+.device-card.offline-card .offline {
+  background: #334155;
+}
+
+.device-card.offline-card .card-link {
+  background: linear-gradient(135deg, #64748b, #475569);
+  color: #e2e8f0;
+}
+
 .card-link {
   display: inline-block;
   margin-top: 0.75rem;
