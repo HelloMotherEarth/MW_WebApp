@@ -10,6 +10,8 @@ export function GraphBuilder({ graph }: Props) {
     return <div className="panel">Select fields and click Graph.</div>;
   }
 
+  const toLocalDate = (isoValue: string) => new Date(isoValue);
+
   const relayOrder = ["r4state", "r3state", "r1state"];
   const relayOffsets: Record<string, number> = {
     r1state: 0,
@@ -44,7 +46,7 @@ export function GraphBuilder({ graph }: Props) {
     type: "scatter" as const,
     mode: "lines" as const,
     name: series.name,
-    x: series.data.map((point) => point.x),
+    x: series.data.map((point) => toLocalDate(point.x)),
     yaxis: series.y_axis === "right" ? "y2" : "y",
     line: {
       shape:
@@ -66,7 +68,10 @@ export function GraphBuilder({ graph }: Props) {
           autosize: true,
           height: 460,
           margin: { l: 56, r: 56, t: 16, b: 48 },
-          xaxis: { title: { text: "Datetime" } },
+          xaxis: {
+            title: { text: "Datetime" },
+            range: [toLocalDate(graph.from_iso), toLocalDate(graph.to_iso)]
+          },
           yaxis: { title: { text: "Temperature / Humidity" } },
           yaxis2: {
             title: { text: "Relay State" },
